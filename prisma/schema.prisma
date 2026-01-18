@@ -13,21 +13,20 @@ enum Role {
 }
 
 model User {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   name       String
-  email      String   @unique
+  email      String
   password   String
-  role       Role     @default(STAFF)
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  role       Role      @default(STAFF)
+  created_at DateTime? @default(now())
+  updated_at DateTime? @default(now()) @updatedAt
 
   @@map("users")
 }
 
 model Category {
-  id         String   @id @default(uuid())
-  name       String   @unique
+  id         String    @id @default(uuid())
+  name       String    @unique
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -41,18 +40,15 @@ model Product {
   id          String   @id @default(uuid())
   name        String
   price       Decimal  @db.Decimal(10, 2)
-  description String   @db.Text
+  description String
   banner      String
   image       String?
   disabled    Boolean  @default(false)
-
   category_id String
-  category    Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
-
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
-
   items       Item[]
+  category    Category @relation(fields: [category_id], references: [id])
 
   @@index([category_id])
   @@map("products")
@@ -61,13 +57,11 @@ model Product {
 model Order {
   id         String   @id @default(uuid())
   table      Int
-  status     Boolean  @default(false) // mantém igual seu projeto (sem quebrar endpoints)
-  draft      Boolean  @default(true)  // mantém igual seu projeto (sem quebrar endpoints)
+  status     Boolean  @default(false)
+  draft      Boolean  @default(true)
   name       String?
-
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
-
   items      Item[]
 
   @@index([table])
@@ -77,17 +71,14 @@ model Order {
 model Item {
   id         String   @id @default(uuid())
   quantity   Int
-
   order_id   String
   product_id String
-
-  order      Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
-  product    Product  @relation(fields: [product_id], references: [id], onDelete: Restrict)
-
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+  order      Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [product_id], references: [id])
 
-  @@unique([order_id, product_id])
+  @@unique([order_id, product_id], map: "items_order_product_unique")
   @@index([order_id])
   @@index([product_id])
   @@map("items")

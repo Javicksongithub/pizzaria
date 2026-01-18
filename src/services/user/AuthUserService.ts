@@ -23,6 +23,7 @@ class AuthUserService {
         name: true,
         email: true,
         password: true,
+        role: true, // ✅ PEGA O ROLE
       },
     });
 
@@ -41,7 +42,7 @@ class AuthUserService {
     }
 
     const token = sign(
-      { name: user.name, email: user.email },
+      { name: user.name, email: user.email, role: user.role }, // ✅ ROLE NO TOKEN
       process.env.JWT_SECRET,
       {
         subject: user.id,
@@ -49,7 +50,13 @@ class AuthUserService {
       }
     );
 
-    return { id: user.id, name: user.name, email: user.email, token };
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role, // ✅ ROLE NO RETORNO
+      token,
+    };
   }
 }
 
