@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-import {hash}from 'bcryptjs'
-
-const prismaClient = new PrismaClient();
+import prisma from "../../prisma";
+import { hash, compare } from "bcryptjs";
 
 interface UserRequest {
   name: string;
@@ -11,36 +9,87 @@ interface UserRequest {
 
 class CreateUserService {
   async execute({ name, email, password }: UserRequest) {
+    // ✅ Normaliza pra não ter duplicidade por espaços/case
+    const normalizedName = String(name || "")
+      .trim()
+      .replace(/\s+/g, " ");
 
-    // Verificar se ele enviou um email
-    if (!email) {
-      throw new Error("Email incorrect");
+    const normalizedEmail = String(email || "")
+      .trim()
+      .toLowerCase();
+
+    const rawPassword = String(password || "").trim();
+
+    // ✅ validações básicas
+    if (!normalizedName) {
+      throw new Error("Nome é obrigatório");
     }
 
-    // Verificar se esse email já está cadastrado na plataforma
-    const userAlreadyExists = await prismaClient.user.findFirst({
-      where: {
-        email: email
-      }
+    if (!normalizedEmail) {
+      throw new Error("E-mail é obrigatório");
+    }
+
+    if (!rawPassword) {
+      throw new Error("Senha é obrigatória");
+    }
+
+    if (rawPassword.length < 6) {
+      throw new Error("Senha deve ter no mínimo 6 caracteres");
+    }
+
+    // ✅ 1) EMAIL ÚNICO
+    const emailAlreadyExists = await prisma.user.findFirst({
+      where: { email: normalizedEmail },
+      select: { id: true },
     });
 
-    // Se o usuário já existe, lançar um erro
-    if (userAlreadyExists) {
-      throw new Error("User already exists");
+    if (emailAlreadyExists) {
+      throw new Error("E-mail já cadastrado");
     }
-     const passwordHash = await hash(password,8)
-    // Adicione aqui a criação do usuário, por exemplo
-    const user = await prismaClient.user.create({
-      data: {
-        name:name,
-        email: email,
-        password:passwordHash, // Adapte conforme necessário
-      }, 
-      select:{
-        id:true,
-        name:true,
-        email:true
+
+    // ✅ 2) NOME ÚNICO (ignora maiúsculas/minúsculas)
+    const nameAlreadyExists = await prisma.user.findFirst({
+      where: {
+        name: {
+          equals: normalizedName,
+          mode: "insensitive",
+        },
+      },
+      select: { id: true },
+    });
+
+    if (nameAlreadyExists) {
+      throw new Error("Nome de usuário já cadastrado");
+    }
+
+    // ✅ 3) SENHA ÚNICA (não pode repetir a mesma senha de outro user)
+    // Obs: isso é pesado em sistemas grandes, mas funciona bem em projetos pequenos.
+    const usersWithPasswords = await prisma.user.findMany({
+      select: { id: true, password: true },
+    });
+
+    for (const u of usersWithPasswords) {
+      const samePassword = await compare(rawPassword, u.password);
+      if (samePassword) {
+        throw new Error("Essa senha já está sendo usada por outro usuário");
       }
+    }
+
+    // ✅ hash da senha
+    const passwordHash = await hash(rawPassword, 8);
+
+    // ✅ cria usuário
+    const user = await prisma.user.create({
+      data: {
+        name: normalizedName,
+        email: normalizedEmail,
+        password: passwordHash,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
     });
 
     return user;
@@ -48,3 +97,4 @@ class CreateUserService {
 }
 
 export { CreateUserService };
+
